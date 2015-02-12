@@ -4,36 +4,58 @@ author: "Joe Phaneuf"
 date: "02/10/2015"
 output: pdf_document
 ---
+```{r}
+library(ggplot2)
+library(reshape2)
 
-*2 pages*
+figures<-vector()
+getNewFigureNumber <- function(figureVector){
+  return(paste0("Fig ",as.character(length(figureVector)+1),". "))
+}
+```
+
+
 ##Executive Summary
 There is irrefutable evidence that people who drive cars with ...automatic... transmission have lower IQs than those who drive manual transmission cars (who score even lower than badasses on bikes!).  But how do automatics and manuals compare when it comes to gas mileage.  This report will use Motor Trend Magazine data from 1974 to determine if there is a measurable difference.
 ##Exploratory Data Analysis
-The dataset contains miles-per-gallon, number of cylinders, engine displacement, rear axle ratio, weight, qsec, V-or-Straight engine, transmission type, number of forward gears, and number of carburetors.
+This dataset contains miles-per-gallon, number of cylinders, engine displacement, rear axle ratio, weight, qsec, V-or-Straight engine, transmission type, number of forward gears, and number of carburetors.
 We'd expect weight to be one of the largest predictors of gas-mileage, so to get our bearings, let's view a plot of gas-mileage against weight, colored by transmission type (0=automatic, 1 = manual)
 ```{r}
-library(ggplot2)
-print(ggplot(mtcars,aes(x=wt,y=mpg,colour=factor(am)))+
+fmpgvwt <- getNewFigureNumber(figures)
+figures<-c(figures,list(ggplot(mtcars,aes(x=wt,y=mpg,colour=factor(am)))+
         geom_point()+scale_colour_brewer(palette="Set1")+
         geom_smooth(method="lm",fill=NA)+xlab("weight (x1000lbs)")+
-        ggtitle("MPG vs. Weight, colored by transmission type"))
-```
-Plot does appear to show a difference in mpg between automatic and manual.
+        ggtitle(paste0(fn,"MPG vs. Weight, colored by transmission type"))))
 
-##Model Selection (more than 1), strategy, w/ diagnostics and residuals
-Our model will be a linear fit on multiple variables, including transmission type.  We'll use our knowledge of automobiles to narrow down the model, and then look for significance from a model summary to narrow it down further.  Weight will obviously be a huge factor, as will engine size (displacement).  We'll check an interaction on engine size and weight, and leave out number of cylinders as it is highly correlated with engine size.
-##Hat values/leverage
-```{r}
-summary(lm(mpg~disp*wt+am+vs+gear,data=mtcars))
 ```
-And, from this summary, we'll decide to remove vs and gear for our final model:
+See `fmpgvwt` in the appendix.  Then, show boxplots of weight and gas-mileage against transmission type.
 ```{r}
-mpgModel <- lm(mpg~disp*wt+factor(am),data=mtcars)
-plot(residuals(mpgModel))
-qqnorm(residuals(mpgModel))
+print(ggplot(mtcars,aes(x=factor(am),y=wt))+geom_boxplot())
+print(ggplot(mtcars,aes(x=factor(am),y=mpg))+geom_boxplot())
 ```
-Can't see any trend in plot of residuals, but the quantile plot indicates some skewed-ness.  There may be some information missing, but good enough for bluegrass.
+
+##Model Selection
+The simplest possible model for this problem is fitting gas-mileage on transmission type:
+```{r}
+summary(lm(mpg~am,data=mtcars))
+```
+However, the R^2 for this model is quite low, indicating that transmission type alone is not sufficient to predict gas mileage.  `fmpgvwt` showed that weight is a very strong predictor for gas mileage, and the varying slopes for transmission type indicate an interaction term:
+```{r}
+mpgModel <- lm(mpg~wt*am,data=mtcars)
+summary(mpgModel)
+x<-qplot(sample=residuals(mpgModel),stat="qq")
+```
+All of the terms in this model are significant (p<0.05), and the R^2 indicates that these terms explain most of the gas-mileage variability.  Introducing other variables in the dataset into this model has little effect, so we'll leave this here.  For model diagnostics, refer to figure `?` for a quantile-quantile plot of the model's residuals.  The qq plot exhibits some skew in thew distribution of the residuals, indicating there may be missing variables from this model.
+
 ##Analysis (coefficients, inference, uncertainty)
 The model p-value for am is 0.17, which is not significant, so we can't claim a relationship on transmission type.
 "beta1 is interpretted as increase or decrease in mean for those in group vs. out of group"
+mpg <- 31.4 -3.785xwt +14.87xmanual-5.29wtxmanual <- 31.4-3.785xwt+1
+
+##Appendix
+```{r}
+for(f in figures){
+  print(f)
+}
+```
 
