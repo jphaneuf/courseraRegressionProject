@@ -4,58 +4,67 @@ author: "Joe Phaneuf"
 date: "02/10/2015"
 output: pdf_document
 ---
-```{r}
+```{r echo=FALSE,results='hide'}
 library(ggplot2)
 library(reshape2)
-
 figures<-vector()
 getNewFigureNumber <- function(figureVector){
   return(paste0("Fig ",as.character(length(figureVector)+1),". "))
 }
 ```
 
-
 ##Executive Summary
-There is irrefutable evidence that people who drive cars with ...automatic... transmission have lower IQs than those who drive manual transmission cars (who score even lower than badasses on bikes!).  But how do automatics and manuals compare when it comes to gas mileage.  This report will use Motor Trend Magazine data from 1974 to determine if there is a measurable difference.
+This report uses Motor Trend Magazine data from 1974 to determine if there is a measurable difference in gas mileage (mpg) between manual and automatic transmission cars.  After fitting a linear model to account for vehicle weight, it was found that the mileage difference between manual and automatic transmission vehicles is a function of weight, where manual transmissions are more efficient at lower weights, and automatic transmissions are more efficient at higher weights.  The data was not sufficient to claim a causal effect.
+
 ##Exploratory Data Analysis
-This dataset contains miles-per-gallon, number of cylinders, engine displacement, rear axle ratio, weight, qsec, V-or-Straight engine, transmission type, number of forward gears, and number of carburetors.
+This dataset contains miles-per-gallon, number of cylinders, engine displacement, rear axle ratio, weight, qsec, V-or-Straight engine, transmission type (*am*), number of forward gears, and number of carburetors.
 We'd expect weight to be one of the largest predictors of gas-mileage, so to get our bearings, let's view a plot of gas-mileage against weight, colored by transmission type (0=automatic, 1 = manual)
 ```{r}
 fmpgvwt <- getNewFigureNumber(figures)
 figures<-c(figures,list(ggplot(mtcars,aes(x=wt,y=mpg,colour=factor(am)))+
         geom_point()+scale_colour_brewer(palette="Set1")+
         geom_smooth(method="lm",fill=NA)+xlab("weight (x1000lbs)")+
-        ggtitle(paste0(fn,"MPG vs. Weight, colored by transmission type"))))
-
+        ggtitle(paste0(fmpgvwt,"MPG vs. Weight, Colored by Transmission Type"))))
 ```
-See `fmpgvwt` in the appendix.  Then, show boxplots of weight and gas-mileage against transmission type.
-```{r}
-print(ggplot(mtcars,aes(x=factor(am),y=wt))+geom_boxplot())
-print(ggplot(mtcars,aes(x=factor(am),y=mpg))+geom_boxplot())
+See `r fmpgvwt` in the appendix.
 ```
 
 ##Model Selection
 The simplest possible model for this problem is fitting gas-mileage on transmission type:
-```{r}
+```{r results='hide'}
 summary(lm(mpg~am,data=mtcars))
 ```
-However, the R^2 for this model is quite low, indicating that transmission type alone is not sufficient to predict gas mileage.  `fmpgvwt` showed that weight is a very strong predictor for gas mileage, and the varying slopes for transmission type indicate an interaction term:
+However, the R^2 for this model is quite low, indicating that transmission type alone is not sufficient to predict gas mileage.  `r fmpgvwt` showed that weight is a very strong predictor for gas mileage, and the varying slopes for transmission type indicate an interaction term:
 ```{r}
 mpgModel <- lm(mpg~wt*am,data=mtcars)
 summary(mpgModel)
-x<-qplot(sample=residuals(mpgModel),stat="qq")
+fresq <- getNewFigureNumber(figures)
+figures <- c(figures,list(qplot(sample=residuals(mpgModel),stat="qq",
+            main=paste0(fresq,"Qunatile-Quantile Plot of mpgModel Residuals"))))
 ```
-All of the terms in this model are significant (p<0.05), and the R^2 indicates that these terms explain most of the gas-mileage variability.  Introducing other variables in the dataset into this model has little effect, so we'll leave this here.  For model diagnostics, refer to figure `?` for a quantile-quantile plot of the model's residuals.  The qq plot exhibits some skew in thew distribution of the residuals, indicating there may be missing variables from this model.
 
-##Analysis (coefficients, inference, uncertainty)
-The model p-value for am is 0.17, which is not significant, so we can't claim a relationship on transmission type.
-"beta1 is interpretted as increase or decrease in mean for those in group vs. out of group"
-mpg <- 31.4 -3.785xwt +14.87xmanual-5.29wtxmanual <- 31.4-3.785xwt+1
+All of the terms in this model are significant (p<0.05), and the R^2 indicates that these terms explain most of the gas-mileage variability.  Introducing other variables in the dataset into this model has little effect on increasing the model fit, so this model will be used for the finaly analysis.  
+
+##Analysis
+```{r}
+mockCars<- data.frame(wt=0:7)
+mockCars$diff<- predict(mpgModel,cbind(mockCars,am=rep(1,8)))-
+                  predict(mpgModel,cbind(mockCars,am=rep(0,8)))
+fmpgdiff <- getNewFigureNumber(figures)
+figures<-c(figures,list(ggplot(mockCars,aes(x=wt,y=diff))+
+        geom_line()+scale_colour_brewer(palette="Set1")+
+        xlab("weight (x1000lbs)")+
+        ggtitle(paste0(fmpgdiff,"Predicted mpg Increase for Manual Transmission vs. Wt"))))
+```
+For model diagnostics, refer to figure `r fresq` for a quantile-quantile plot of the model's residuals.  The qq plot exhibits some non-linearity, indicating some skew in thew distribution of the residuals.
+
+With 95% confidence, the transmission type variable (am) is significant (p=0.001), as is the transmission:weight interaction term (p=0.001).  The interaction term indicates that the mileage difference due to transmission type is dependant on weight.  Using the model coefficients, we can say that manual tranmission cars get `r coef(mpgModel)[3]` `r coef(mpgModel)[4]`x weight(x1000lbs) higher mpg than automatic transmission cars.  See `r fmpgdiff` for a plot of manual transmission mpg difference as a function of weight.  Note that this line crosses zero, meaning in some conditions automatic transmission yield higher gas mileage.
 
 ##Appendix
 ```{r}
 for(f in figures){
   print(f)
+  print("")
 }
 ```
 
