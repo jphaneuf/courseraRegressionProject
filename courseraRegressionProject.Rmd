@@ -1,12 +1,12 @@
 ---
-title: "Coursera Regression Project"
+title: "Vehicle Transmission Type Effects on Gas Mileage"
 author: "Joe Phaneuf"
 date: "02/10/2015"
 output: pdf_document
 ---
 ```{r echo=FALSE,results='hide'}
 library(ggplot2)
-library(reshape2)
+#library(reshape2)
 figures<-vector()
 getNewFigureNumber <- function(figureVector){
   return(paste0("Fig ",as.character(length(figureVector)+1),". "))
@@ -14,7 +14,7 @@ getNewFigureNumber <- function(figureVector){
 ```
 
 ##Executive Summary
-This report uses Motor Trend Magazine data from 1974 to determine if there is a measurable difference in gas mileage (mpg) between manual and automatic transmission cars.  After fitting a linear model to account for vehicle weight, it was found that the mileage difference between manual and automatic transmission vehicles is a function of weight, where manual transmissions are more efficient at lower weights, and automatic transmissions are more efficient at higher weights.  The data was not sufficient to claim a causal effect.
+This report uses Motor Trend Magazine data from 1974 to determine if there is a measurable difference in gas mileage (mpg) between manual and automatic transmission cars.  After fitting a linear model to account for vehicle weight, there was not enough evidence to conclude that manual or automatic transmissions achieve better gas mileage.
 
 ##Exploratory Data Analysis
 This dataset contains miles-per-gallon, number of cylinders, engine displacement, rear axle ratio, weight, qsec, V-or-Straight engine, transmission type (*am*), number of forward gears, and number of carburetors.
@@ -27,7 +27,7 @@ figures<-c(figures,list(ggplot(mtcars,aes(x=wt,y=mpg,colour=factor(am)))+
         ggtitle(paste0(fmpgvwt,"MPG vs. Weight, Colored by Transmission Type"))))
 ```
 See `r fmpgvwt` in the appendix.
-```
+
 
 ##Model Selection
 The simplest possible model for this problem is fitting gas-mileage on transmission type:
@@ -43,23 +43,30 @@ figures <- c(figures,list(qplot(sample=residuals(mpgModel),stat="qq",
             main=paste0(fresq,"Qunatile-Quantile Plot of mpgModel Residuals"))))
 ```
 
-All of the terms in this model are significant (p<0.05), and the R^2 indicates that these terms explain most of the gas-mileage variability.  Introducing other variables in the dataset into this model has little effect on increasing the model fit, so this model will be used for the finaly analysis.  
+All of the terms in this model are significant (p<0.05), and the R^2 indicates that these terms explain most of the gas-mileage variability.  Introducing other variables in the dataset into this model has little effect on increasing the model fit, so this model will be used for the final analysis.  
 
 ##Analysis
 ```{r}
+#get coefficients for 95% confidence interval:
+sumCoef <- summary(mpgModel)$coefficients
+amSlope95Int <- sumCoef[3,1] + c(-1,0,1) * qt(.975, df = mpgModel$df) * sumCoef[3, 2]
+amWtSlope95Int <-sumCoef[4,1] + c(-1,0,1) * qt(.975, df = mpgModel$df) * sumCoef[4, 2]
 mockCars<- data.frame(wt=0:7)
-mockCars$diff<- predict(mpgModel,cbind(mockCars,am=rep(1,8)))-
-                  predict(mpgModel,cbind(mockCars,am=rep(0,8)))
+pI <- function(wt,i){amSlope95Int[i]+wt*amWtSlope95Int[i]} #predictInterval
+mockCars<-cbind(mockCars,lwr=pI(mockCars$wt,1),mpg=pI(mockCars$wt,2),
+                upr=pI(mockCars$wt,3))
 fmpgdiff <- getNewFigureNumber(figures)
-figures<-c(figures,list(ggplot(mockCars,aes(x=wt,y=diff))+
-        geom_line()+scale_colour_brewer(palette="Set1")+
+figures<-c(figures,list(ggplot(mockCars,aes(x=wt,y=mpg,colour="mpg"))+
+        geom_line()+geom_line(aes(x=wt,y=lwr,colour="lower"))+
+        geom_line(aes(x=wt,y=upr,colour="upper"))+
         xlab("weight (x1000lbs)")+
-        ggtitle(paste0(fmpgdiff,"Predicted mpg Increase for Manual Transmission vs. Wt"))))
+        ggtitle(paste0(fmpgdiff,"Mpg Increase for Manual vs. Weight: 95% Interval"))))
 ```
-For model diagnostics, refer to figure `r fresq` for a quantile-quantile plot of the model's residuals.  The qq plot exhibits some non-linearity, indicating some skew in thew distribution of the residuals.
+For model diagnostics, refer to figure `r fresq` for a quantile-quantile plot of the model's residuals.  The qq plot exhibits some non-linearity, indicating some skew in the distribution of the residuals.
 
-With 95% confidence, the transmission type variable (am) is significant (p=0.001), as is the transmission:weight interaction term (p=0.001).  The interaction term indicates that the mileage difference due to transmission type is dependant on weight.  Using the model coefficients, we can say that manual tranmission cars get `r coef(mpgModel)[3]` `r coef(mpgModel)[4]`x weight(x1000lbs) higher mpg than automatic transmission cars.  See `r fmpgdiff` for a plot of manual transmission mpg difference as a function of weight.  Note that this line crosses zero, meaning in some conditions automatic transmission yield higher gas mileage.
+The interaction term indicates that the mileage difference due to transmission type is dependant on weight.  Using the model coefficients, we can say with 95% confidence that gas mileage for manual tranmission cars falls within these two bounding lines (functions of weight) `r amSlope95Int[1]` `r amWtSlope95Int[1]` x weight(x1000lbs) and `r amSlope95Int[3]`  `r amWtSlope95Int[3]` x weight(x1000lbs) .  See `r fmpgdiff` for a plot of manual transmission mpg difference as a function of weight, including 95% confidence bounds (upper and lower).  The 95% interval contains zero for almost the entire range of vehicle weight, so we **cannot claim a gas mileage difference between automatic and manual tranmission vehicles**, after controlling for vehicle weight.  Note that there is a small weight window where the 95% interval does not contain zero, however the vehicles in this dataset in that weight window are exclusively manual transmissions (see `r fmpgvwt`).
 
+************************
 ##Appendix
 ```{r}
 for(f in figures){
